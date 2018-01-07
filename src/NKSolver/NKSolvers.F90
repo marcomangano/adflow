@@ -1651,7 +1651,7 @@ module ANKSolver
   logical :: ANK_turbSetup=.False.
   integer(kind=intType) :: ANK_iterTurb, nStateTurb
   real(kind=realType) :: lambdaTurb
-  real(kind=alwaysRealType) :: totalRTurb_pcUpdate, linResOldTurb
+  real(kind=alwaysRealType) :: linResOldTurb, ANK_physLSTolTurb
 
 contains
 
@@ -3135,7 +3135,9 @@ contains
                       ! if coupled ank is used, nstate = nw and this loop is executed
                       ! if no turbulence variables, this loop will be automatically skipped
                       ! check turbulence variable
-                      ratio = abs(wvec_pointer(ii)/(dvec_pointer(ii)+eps))*ANK_physLSTol
+                      ratio = (wvec_pointer(ii)/(dvec_pointer(ii)+eps))*ANK_physLSTolTurb
+                      ! only check the updates that drive turbulence negative
+                      if (ratio .lt. zero) ratio = one
                       lambdaL = min(lambdaL, ratio)
                       ii = ii + 1
                    end do
@@ -3218,7 +3220,9 @@ contains
                         ! if coupled ank is used, nstate = nw and this loop is executed
                         ! if no turbulence variables, this loop will be automatically skipped
                         ! check turbulence variable
-                        ratio = abs(wvec_pointer(ii)/(dvec_pointer(ii)+eps))*ANK_physLSTol
+                        ratio = (wvec_pointer(ii)/(dvec_pointer(ii)+eps))* ANK_physLSTolTurb
+                        ! only check the updates that drive turbulence negative
+                        if (ratio .lt. zero) ratio = one
                         lambdaL = min(lambdaL, ratio)
                         ii = ii + 1
                     end do
@@ -3254,6 +3258,7 @@ contains
     use blockPointers, only : nDom, flowDoms
     use inputIteration, only : L2conv
     use inputTimeSpectral, only : nTimeIntervalsSpectral
+    use inputDiscretization, only : lumpedDiss
     use iteration, only : approxTotalIts, totalR0, totalR, currentLevel
     use utils, only : EChk, setPointers
     use turbMod, only : secondOrd
@@ -3289,11 +3294,7 @@ contains
         call EChk(ierr, __FILE__, __LINE__)
 
         ! Determine if we need to form the Preconditioner
-        if (mod(ANK_iterTurb, ANK_jacobianLag) == 0 .or. &
-            totalRTurb/totalRTurb_pcUpdate < ANK_pcUpdateTol) then
-
-            ! Record the total residuals when the PC is calculated.
-            totalRTurb_pcUpdate = totalRTurb
+        if (mod(ANK_iterTurb, ANK_jacobianLag) == 0) then
 
             ! Actually form the preconditioner and factorize it.
             if (myid .eq. 0 .and. ANK_turbDebug) &
@@ -3320,6 +3321,7 @@ contains
 
         if (totalR > ANK_secondOrdSwitchTol*totalR0) then
             ! Save if second order turbulence is used, we will only use 1st order during ANK (only matters for the coupled solver)
+            lumpedDiss = .True.
             secondOrdSave = secondOrd
             secondOrd =.False.
 
@@ -3370,6 +3372,7 @@ contains
         if (totalR > ANK_secondOrdSwitchTol*totalR0) then
             ! Replace the second order turbulence option
             secondOrd = secondOrdSave
+            lumpedDiss = .False.
         end if
 
         ! Compute the maximum step that will limit the change
@@ -3520,6 +3523,7 @@ contains
     use inputPhysics, only : equations
     use inputIteration, only : L2conv
     use inputTimeSpectral, only : nTimeIntervalsSpectral
+    use inputDiscretization, only : lumpedDiss
     use iteration, only : approxTotalIts, totalR0, totalR, stepMonitor, linResMonitor, currentLevel, iterType
     use utils, only : EChk, setPointers, myisnan
     use turbAPI, only : turbSolveSegregated
@@ -3699,6 +3703,7 @@ contains
     if (totalR > ANK_secondOrdSwitchTol*totalR0) then
        ! Setting lumped dissipation to true gives approximate fluxes
        ANK_useDissApprox =.True.
+       lumpedDiss = .True.
 
        ! Save if second order turbulence is used, we will only use 1st order during ANK (only matters for the coupled solver)
        secondOrdSave = secondOrd
@@ -3761,6 +3766,7 @@ contains
     if (totalR > ANK_secondOrdSwitchTol*totalR0) then
        ! Set ANK_useDissApprox back to False to go back to using actual flux routines
        ANK_useDissApprox =.False.
+       lumpedDiss = .False.
 
        ! Replace the second order turbulence option
        secondOrd = secondOrdSave
