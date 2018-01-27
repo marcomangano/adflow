@@ -1629,6 +1629,7 @@ module ANKSolver
   logical :: ANK_useFullVisc
   logical :: ANK_ADPC
   logical :: ANK_turbDebug
+  logical :: ANK_useMatrixFree
   integer(kind=intType) :: ANK_nsubIterTurb
 
   ! Misc variables
@@ -1755,7 +1756,13 @@ contains
        call EChk(ierr, __FILE__, __LINE__)
 
        ! Set operators for the solver
-       call KSPSetOperators(ANK_KSP, dRdw, dRdwPre, ierr)
+       if (ANK_useMatrixFree) then
+           ! Matrix free drdw
+           call KSPSetOperators(ANK_KSP, dRdw, dRdwPre, ierr)
+       else
+           ! Matrix based drdw = drdwpre
+           call KSPSetOperators(ANK_KSP, dRdwPre, dRdwPre, ierr)
+       end if
        call EChk(ierr, __FILE__, __LINE__)
 
        if (useLinResMonitor) then
@@ -1843,7 +1850,13 @@ contains
            call EChk(ierr, __FILE__, __LINE__)
 
            ! Set operators for the solver
-           call KSPSetOperators(ANK_KSPTurb, dRdwTurb, dRdwPreTurb, ierr)
+           if (ANK_useMatrixFree) then
+              ! Matrix free
+              call KSPSetOperators(ANK_KSPTurb, dRdwTurb, dRdwPreTurb, ierr)
+           else
+              ! Matrix based
+              call KSPSetOperators(ANK_KSPTurb, dRdwPreTurb, dRdwPreTurb, ierr)
+           end if
            call EChk(ierr, __FILE__, __LINE__)
 
            ANK_turbSetup = .True.
@@ -3778,7 +3791,8 @@ contains
     ! Compute the maximum step that will limit the change in pressure
     ! and energy to some user defined fraction.
     call physicalityCheckANK(lambda)
-    lambda = max(ANK_stepMin, lambda)
+    if (ANK_CFL .gt. ANK_CFLMin .and. lambda .lt. ANK_stepMin) &
+        lambda = zero
 
     ! Take the uodate after the physicality check.
     call VecAXPY(wVec, -lambda, deltaW, ierr)
@@ -3818,7 +3832,7 @@ contains
        ! potentially already physically limited step.
        lambda = 0.7_realType * lambda
 
-       backtrack: do iter=1, 10
+       backtrack: do iter=1, 12
 
           ! Apply the new step
           call VecAXPY(wVec, -lambda, deltaW, ierr)

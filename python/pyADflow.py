@@ -4708,6 +4708,7 @@ class ADFLOW(AeroSolver):
             'ankadpc':[bool, False],
             'anknsubiterturb':[int,1],
             'ankturbkspdebug':[bool,False],
+            'ankusematrixfree':[bool,True],
 
             # Load Balance/partitioning parameters
             'blocksplitting':[bool, True],
@@ -5019,6 +5020,7 @@ class ADFLOW(AeroSolver):
             'ankadpc':['ank','ank_adpc'],
             'anknsubiterturb':['ank','ank_nsubiterturb'],
             'ankturbkspdebug':['ank','ank_turbdebug'],
+            'ankusematrixfree':['ank','ank_usematrixfree'],
             # Load Balance Paramters
             'blocksplitting':['parallel', 'splitblocks'],
             'loadimbalance':['parallel', 'loadimbalance'],
