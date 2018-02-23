@@ -171,7 +171,6 @@ contains
 
        ! Very important to use only Second-Order dissipation for PC
        lumpedDiss=.True.
-       approxSA = .True.
        secondOrdSave = secondOrd
        secondOrd = .False.
     else
@@ -524,7 +523,6 @@ contains
     ! Return dissipation Parameters to normal -> VERY VERY IMPORTANT
     if (usePC) then
        lumpedDiss = .False.
-       approxSA = .False.
        secondOrd = secondOrdSave
     end if
 
