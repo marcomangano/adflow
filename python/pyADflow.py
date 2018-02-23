@@ -349,6 +349,19 @@ class ADFLOW(AeroSolver):
             print('| %-30s: %10.3f sec'%('Total Init Time',finalInitTime - startInitTime))
             print('+--------------------------------------------------+')
 
+    def __del__(self):
+        """
+        Clean up allocated memory if necessary
+        """
+        # Release PETSc memory
+        self.releaseAdjointMemory()
+        self.adflow.nksolver.destroynksolver()
+        self.adflow.anksolver.destroyanksolver()
+
+        # Release Fortran memory
+        self.adflow.utils.releasememorypart1()
+        self.adflow.utils.releasememorypart2()
+
     def setMesh(self, mesh):
         """
         Set the mesh object to the aero_solver to do geometric deformations
@@ -1011,6 +1024,7 @@ class ADFLOW(AeroSolver):
 
         t2 = time.time()
         solTime = t2 - t1
+        self.curAP.solTime = solTime
 
         # Post-Processing
         # --------------------------------------------------------------
