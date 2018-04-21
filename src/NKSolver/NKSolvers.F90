@@ -1646,8 +1646,11 @@ module ANKSolver
   integer(kind=intType) :: nState
   real(kind=alwaysRealType) :: totalR_old, totalR_pcUpdate ! for recording the previous residual
   real(kind=alwaysRealType) :: rtolLast, linResOld ! for recording the previous relativel tolerance for Eisenstat-Walker
-  logical :: updateCFL, ANK_useDissApprox, ANK_getCond
-  real(kind=realType) :: ANK_condSolveTol
+  logical :: ANK_useDissApprox, ANK_getCond
+  real(kind=realType) :: ANK_condSolveTol, ANK_condRTol
+  logical :: updatePC, firstflag, firstTurbCond
+  integer(kind=intType) :: ANK_condMaxIter
+  integer(kind=intType) :: ANK_condLag
 
   ! Turb KSP related modifications
   logical :: ANK_coupled=.False.
@@ -1758,7 +1761,7 @@ contains
        call EChk(ierr, __FILE__, __LINE__)
 
        if (ANK_getCond) then
-          call KSPSetComputeSingularValues(ANK_KSP, PETSC_TRUE, ierr)
+          call KSPSetComputeEigenValues(ANK_KSP, PETSC_TRUE, ierr)
           call EChk(ierr, __FILE__, __LINE__)
        end if
 
@@ -1857,7 +1860,7 @@ contains
            call EChk(ierr, __FILE__, __LINE__)
 
            if (ANK_getCond) then
-              call KSPSetComputeSingularValues(ANK_KSPTurb, PETSC_TRUE, ierr)
+              call KSPSetComputeEigenvalues(ANK_KSPTurb, PETSC_TRUE, ierr)
               call EChk(ierr, __FILE__, __LINE__)
            end if
 
@@ -3308,9 +3311,10 @@ contains
     integer(kind=intType) :: i,j,k,n
     real(kind=realType) :: atol, val, v2, factK, gm1, emin, emax
     real(kind=alwaysRealType) :: rtol, totalR_dummy, linearRes, norm
-    real(kind=alwaysRealType) :: resHist(ank_maxIter+1), resHistNew(ank_maxIter+1)
+    real(kind=alwaysRealType) :: resHist(ANK_condMaxIter+1), resHistNew(ANK_condMaxIter+1)
     real(kind=alwaysRealType) :: unsteadyNorm, unsteadyNorm_old
     real(kind=alwaysRealType) :: linResMonitorTurb, totalRTurb
+    real(kind=realType) :: reig(ANK_condMaxIter), ceig(ANK_condMaxIter)
     logical :: secondOrdSave, correctForK, LSFailed
 
     ! Calculate the residuals and set rVecTurb before the first iteration
@@ -3325,13 +3329,17 @@ contains
         call EChk(ierr, __FILE__, __LINE__)
 
         ! Determine if we need to form the Preconditioner
-        if (mod(ANK_iterTurb, ANK_jacobianLag) == 0) then
+        if (mod(ANK_iterTurb, ANK_jacobianLag) == 0 .and. updatePC) then
 
             ! Actually form the preconditioner and factorize it.
             if (myid .eq. 0 .and. ANK_turbDebug) &
             write(*,*) "Re-doing turb PC"
             call FormJacobianANKTurb()
             ANK_iterTurb = 0
+        end if
+
+        if (ank_getcond .and. (mod(ANK_iterTurb, ank_condlag) == 0))then
+          call FormJacobianANKTurb()
         end if
 
         ! Increment the iteration counter
@@ -3430,7 +3438,7 @@ contains
           call KSPGetIterationNumber(ANK_KSPTurb, kspIterationsNew, ierr)
           call EChk(ierr, __FILE__, __LINE__)
 
-          call KSPComputeExtremeSingularValues(ANK_KSPTurb, emax, emin, ierr)
+          call KSPComputeEigenvalues(ANK_KSPTurb, ANK_condMaxIter, reig, ceig, kspIterationsNew, ierr)
           call EChk(ierr, __FILE__, __LINE__)
         end if
 
@@ -3543,15 +3551,20 @@ contains
 
         linResMonitorTurb = resHist(kspIterations+1)/resHist(1)
 
-        if (myid == zero .and. ANK_getCond) &
-          write(*,*)"Turb: linres, max, min, cond", resHistNew(kspIterationsNew+1)/resHistNew(1), emax, emin, emax/emin
+        if (myid == zero .and. ANK_getCond) then
+          write(*,*)"Turb: cfl, linres, iter", ANK_CFL, &
+          resHistNew(kspIterationsNew+1)/resHistNew(1), kspIterationsNew
+          do i = 1, kspIterationsNew
+            write(*,*) 'n, real, complex', i, reig(i), ceig(i)
+          end do
+        end if
 
-        if ((linResMonitorTurb .ge. ANK_rtol .and. &
+        if (updatepc .and.((linResMonitorTurb .ge. ANK_rtol .and. &
             totalR > ANK_secondOrdSwitchTol*totalR0 .and.&
             linResOldTurb .le. ANK_rtol) &
             !.or. LSFailed) then
 !            .or. lambdaTurb .le. ANK_stepMin) then
-            .or. lambdaTurb .eq. zero) then
+            .or. lambdaTurb .eq. zero)) then
 
             ! We should reform the PC since it took longer than we want,
             ! or we need to adjust the CFL because the last update was bad,
@@ -3614,9 +3627,10 @@ contains
     integer(kind=intType) :: i,j,k
     real(kind=realType) :: atol, val, v2, factK, gm1, emax, emin
     real(kind=alwaysRealType) :: rtol, totalR_dummy, linearRes, norm
-    real(kind=alwaysRealType) :: resHist(ank_maxIter+1)
-    real(kind=alwaysRealType) :: resHistNew(401)
+    real(kind=alwaysRealType) :: resHist(ANK_condMaxIter+1)
+    real(kind=alwaysRealType) :: resHistNew(ANK_condMaxIter+1)
     real(kind=alwaysRealType) :: unsteadyNorm, unsteadyNorm_old
+    real(kind=realType) :: reig(ANK_condMaxIter), ceig(ANK_condMaxIter)
     logical :: secondOrdSave, correctForK, LSFailed
 
     ! Enter this check if this is the first ANK step OR we are switching to the coupled ANK solver
@@ -3628,14 +3642,7 @@ contains
        ! and set the appropriate flag
        if (totalR .le. ANK_coupledSwitchTol * totalR0 .and. (.not. ANK_coupled)) then
           call destroyANKsolver()
-<<<<<<< HEAD
-          ANK_useTurbDADI = .False.
-       else if (firstcall .and. (totalR > ANK_coupledSwitchTol * totalR0) .and. (.not. ANK_useTurbDADI)) then
-          call destroyANKsolver()
-          ANK_useTurbDADI = .True.
-=======
           ANK_coupled = .True.
->>>>>>> 25618211... Implemented the separate KSP solver for Turbulence, again. Probably buggy as of now.
        end if
 
        call setupANKSolver()
@@ -3670,9 +3677,49 @@ contains
           linResOld = zero
           linResOldTurb=zero
           ANK_iter = 0
+
+          updatepc = .true.
+          firstflag = .true.
+          firstTurbCond = .true.
        end if
     else
        ANK_iter = ANK_iter + 1
+    end if
+
+    if (ANK_iter .ge. 10 .and. ank_getcond .and. (myid == 0)) call EChk(1,__FILE__, __LINE__)
+
+    ! Determine if we reached the relative convergence to get the condition number
+    if ((ank_condrtol .ge. totalR/totalR0) .and. firstFlag) then
+      ank_maxiter = ANK_condMaxIter
+      ank_getcond = .true.
+      ANK_turbDebug = .true.
+      ! Destroy the solver, and re-create with desired GMRES parameters
+      call destroyANKsolver()
+      call setupANKSolver()
+      ! Copy the adflow 'w' into the petsc wVec
+      call setwVecANK(wVec,1,nstate)
+      ! Evaluate the residual before we start
+      call blocketteRes(useUpdateDt=.True.)
+      if (ANK_coupled) then
+         call setRvec(rVec)
+      else
+         call setRVecANK(rVec)
+      end if
+      ! Check if we are using the turb KSP
+      if ((.not. ANK_coupled) .and. (.not. ANK_useTurbDADI)) then
+         call setwVecANK(wVecTurb,nt1,nt2)
+         call setRVecANKTurb(rVecTurb)
+      end if
+
+      ! Set flags to prevent updates to the PC, CFL
+      updatePC = .false.
+      firstflag  = .false.
+
+      ! Also set the limits to the current CFL
+      ank_cflmin   = ank_cfl
+      ank_cfllimit = ank_cfl
+      ANK_iter = 0
+      ank_iterturb = 0
     end if
 
     ! Compute the norm of rVec, which is identical to the
@@ -3681,7 +3728,7 @@ contains
     call EChk(ierr, __FILE__, __LINE__)
 
     ! Determine if if we need to form the Preconditioner
-    if (mod(ANK_iter, ANK_jacobianLag) == 0 .or. totalR/totalR_pcUpdate < ANK_pcUpdateTol) then
+    if ((mod(ANK_iter, ANK_jacobianLag) == 0 .or. totalR/totalR_pcUpdate < ANK_pcUpdateTol).and. updatePC) then
 
        ! First of all, update the minimum cfl wrt the overall convergence
        ANK_CFLMin = min(ANK_CFLLimit, ANK_CFLMin0*(totalR0/totalR)**ANK_CFLExponent)
@@ -3747,6 +3794,11 @@ contains
                iterType = "    CANK"
            end if
        end if
+    end if
+
+    if (ank_getcond .and. (mod(ank_iter, ank_condlag) == 0)) then
+      call FormJacobianANK()
+      iterType = "  *ANK"
     end if
 
     ! Start with trying to take the full step set by the user.
@@ -3859,7 +3911,7 @@ contains
       call KSPGetIterationNumber(ANK_KSP, kspIterationsNew, ierr)
       call EChk(ierr, __FILE__, __LINE__)
 
-      call KSPComputeExtremeSingularValues(ANK_KSP, emax, emin, ierr)
+      call KSPComputeEigenValues(ANK_KSP, ANK_condMaxiter, reig, ceig, kspIterationsNew, ierr)
       call EChk(ierr, __FILE__, __LINE__)
     end if
 
@@ -4004,15 +4056,20 @@ contains
 
     linResMonitor = resHist(kspIterations+1)/resHist(1)
 
-    if (myid == zero .and. ANK_getCond) &
-      write(*,*)"Flow: linres, max, min, cond", resHistNew(kspIterationsNew+1)/resHistNew(1), emax, emin, emax/emin
+    if (myid == zero .and. ANK_getCond) then
+      write(*,*)"Flow: cfl, linres, iter", ANK_CFL, &
+      resHistNew(kspIterationsNew+1)/resHistNew(1), kspIterationsNew
+      do i = 1, kspIterationsNew
+        write(*,*) 'n, real, complex', i, reig(i), ceig(i)
+      end do
+    end if
 
-    if ((linResMonitor .ge. ANK_rtol .and. &
+    if (updatePC .and. ((linResMonitor .ge. ANK_rtol .and. &
          totalR > ANK_secondOrdSwitchTol*totalR0 .and.&
          linResOld .le. ANK_rtol) &
          !.or. LSFailed) then
          !.or. lambda .le. ANK_stepMin) then
-         .or. lambda .eq. zero) then
+         .or. lambda .eq. zero)) then
        ! We should reform the PC since it took longer than we want,
        ! or we need to adjust the CFL because the last update was bad,
        ! or convergence since the last PC update was good enough and we
