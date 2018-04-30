@@ -5104,6 +5104,7 @@ class ADFLOW(AeroSolver):
                              'outputsurfacefamily',
                              'cutcallback',
                              'infchangecorrection',
+                             'skipafterfailedadjoint',
                          ))
 
         # Deprecated options. These should not be used, but old
