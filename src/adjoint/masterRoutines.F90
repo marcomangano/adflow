@@ -270,12 +270,17 @@ contains
     use inputOverset, only : oversetUpdateMode
     use oversetCommUtilities, only : updateOversetConnectivity_d
     use actuatorRegionData, only : nActuatorRegions
-    implicit none
-
+#include <petscversion.h>
+#if PETSC_VERSION_GE(3,8,0)
+#include <petsc/finclude/petsc.h>
+  use petsc
+  implicit none
+#else
+  implicit none
 #define PETSC_AVOID_MPIF_H
 #include "petsc/finclude/petsc.h"
 #include "petsc/finclude/petscvec.h90"
-
+#endif
     ! Input Arguments:
     real(kind=realType), intent(in), dimension(:) :: wDot, xDot
     integer(kind=intType), optional, dimension(:, :), intent(in) :: famLists
@@ -639,10 +644,18 @@ contains
     ! mham additions
     use section, only: sections,nSections ! used in t-declaration
     use solverutils, only : slipvelocitiesfinelevel_block,gridvelocitiesfinelevel_block,normalvelocities_block
-    implicit none
+
+#include <petscversion.h>
+#if PETSC_VERSION_GE(3,8,0)
+#include <petsc/finclude/petsc.h>
+    use petsc, only : add_values, scatter_reverse
+  implicit none
+#else
+  implicit none
 #define PETSC_AVOID_MPIF_H
 #include "petsc/finclude/petsc.h"
 #include "petsc/finclude/petscvec.h90"
+#endif
 
     ! Input variables:
     real(kind=realType), intent(in), dimension(:) :: dwBar
