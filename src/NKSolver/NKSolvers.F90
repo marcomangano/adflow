@@ -1609,7 +1609,7 @@ module ANKSolver
 
   ! Turb KSP related PETSc objects
   Mat  dRdwTurb, dRdwPreTurb
-  Vec wVecTurb, rVecTurb, deltaWTurb
+  Vec wVecTurb, rVecTurb, deltaWTurb, baseResTurb
   KSP  ANK_KSPTurb
 
   PetscFortranAddr   ctx(1)
@@ -1820,6 +1820,9 @@ contains
            call EChk(ierr, __FILE__, __LINE__)
 
            call VecDuplicate(wVecTurb, deltaWTurb, ierr)
+           call EChk(ierr, __FILE__, __LINE__)
+
+           call VecDuplicate(wVecTurb, baseResTurb, ierr)
            call EChk(ierr, __FILE__, __LINE__)
 
            ! Create Pre-Conditioning Matrix
@@ -2774,6 +2777,9 @@ contains
            call VecDestroy(deltaWTurb, ierr)
            call EChk(ierr, __FILE__, __LINE__)
 
+           call VecDestroy(baseResTurb, ierr)
+           call EChk(ierr, __FILE__, __LINE__)
+
            call KSPDestroy(ANK_KSPTurb, ierr)
            call EChk(ierr, __FILE__, __LINE__)
 
@@ -3190,7 +3196,7 @@ contains
     call EChk(ierr,__FILE__,__LINE__)
 
     ! Make sure that we did not get any NaN's in the process
-    if (isnan(lambdaL)) lambdaL = zero
+    if (myisnan(lambdaL)) lambdaL = zero
 
     ! Finally, communicate the step size across processes and return
     call mpi_allreduce(lambdaL, lambdaP, 1_intType, adflow_real, &
@@ -3205,7 +3211,7 @@ contains
     use blockPointers, only : ndom, il, jl, kl
     use flowVarRefState, only : nw, nwf, nt1,nt2
     use inputtimespectral, only : nTimeIntervalsSpectral
-    use utils, only : setPointers, EChk
+    use utils, only : setPointers, EChk, myisnan
     use communication, only : ADflow_comm_world
     implicit none
 
@@ -3274,7 +3280,7 @@ contains
     call EChk(ierr,__FILE__,__LINE__)
 
     ! Make sure that we did not get any NaN's in the process
-    if (isnan(lambdaL)) lambdaL = zero
+    if (myisnan(lambdaL)) lambdaL = zero
 
     ! Finally, communicate the step size across processes and return
     call mpi_allreduce(lambdaL, lambdaP, 1_intType, adflow_real, &
@@ -3354,10 +3360,6 @@ contains
         call MatAssemblyEnd(dRdwTurb, MAT_FINAL_ASSEMBLY, ierr)
         call EChk(ierr, __FILE__, __LINE__)
 
-        ! Set the BaseVector of the matrix-free matrix:
-        call MatMFFDSetBase(dRdwTurb, wVecTurb, PETSC_NULL_OBJECT, ierr)
-        call EChk(ierr, __FILE__, __LINE__)
-
         if (totalR > ANK_secondOrdSwitchTol*totalR0) then
             ! Save if second order turbulence is used, we will only use 1st order during ANK (only matters for the coupled solver)
             approxSA = .True.
@@ -3393,6 +3395,12 @@ contains
         call EChk(ierr, __FILE__, __LINE__)
 
         call KSPSetResidualHistory(ANK_KSPTurb, resHist, ank_maxIter+1, PETSC_TRUE, ierr)
+        call EChk(ierr, __FILE__, __LINE__)
+
+        ! Set the BaseVector of the matrix-free matrix:
+        call formFunction_mf(ctx, wVecTurb, baseResTurb, ierr)
+        call EChk(ierr, __FILE__, __LINE__)
+        call MatMFFDSetBase(dRdWTurb, wVecTurb, baseResTurb, ierr)
         call EChk(ierr, __FILE__, __LINE__)
 
         ! Actually do the Linear Krylov Solve
