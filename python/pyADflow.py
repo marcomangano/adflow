@@ -3767,8 +3767,7 @@ class ADFLOW(AeroSolver):
                     print('')
                     # mham: seems like a deprecated call. There is e.g. no 'config=' optional
                     # keyword argument if you look in the DVGeometry.py source code.
-                #xsdot += self.DVGeo.totalSensitivityProd(xDvDot, self.curAP.ptSetName, self.comm, config=self.curAP.name).reshape(xsdot.shape)
-                xsdot += self.DVGeo.totalSensitivityProd(xDvDot, self.curAP.ptSetName,comm=self.comm).reshape(xsdot.shape)
+                xsdot += self.DVGeo.totalSensitivityProd(xDvDot, self.curAP.ptSetName, self.comm, config=self.curAP.name).reshape(xsdot.shape)
             if self.mesh is not None:
                 xsdot = self.mapVector(xsdot, self.meshFamilyGroup,
                                        self.designFamilyGroup, includeZipper=False)
