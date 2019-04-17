@@ -1416,7 +1416,7 @@ contains
     !
     !      Local variables.
     !
-    integer(kind=intType) :: i, j, k, sigma
+    integer(kind=intType) :: i, j, k
     integer(kind=intType) :: ii, jj, mm, iiMax, jjMax, offVis
 
     integer(kind=intType), dimension(2,2) :: rangeFace
@@ -2223,8 +2223,7 @@ contains
              ! Get local pressure
              plocal = half*(pp1(i,j) + pp2(i,j))
 
-             sigma = 1.4
-             sensor1 = (-(fact)*(plocal-pInf))- sigma
+             sensor1 = (-(fact)*(plocal-pInf))- cavitationnumber
              sensor1 = one/(one + exp(-2*10*sensor1))
              buffer(nn) = sensor1
              !print*, sensor
