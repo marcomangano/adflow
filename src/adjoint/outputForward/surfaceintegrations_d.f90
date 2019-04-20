@@ -1836,8 +1836,8 @@ contains
         cellaread = arg1d/(2.0*sqrt(arg1))
       end if
       cellarea = sqrt(arg1)
-      aread = aread + cellaread
-      area = area + cellarea
+      aread = aread + blk*cellaread
+      area = area + cellarea*blk
       overcellaread = (-cellaread)/cellarea**2
       overcellarea = 1/cellarea
       call computeptot_d(rhom, rhomd, vxm, vxmd, vym, vymd, vzm, vzmd, &
@@ -2147,7 +2147,7 @@ contains
       mnm = vmag/am
       arg1 = ssi(i, j, 1)**2 + ssi(i, j, 2)**2 + ssi(i, j, 3)**2
       cellarea = sqrt(arg1)
-      area = area + cellarea
+      area = area + cellarea*blk
       overcellarea = 1/cellarea
       call computeptot(rhom, vxm, vym, vzm, pm, ptot)
       call computettot(rhom, vxm, vym, vzm, pm, ttot)
