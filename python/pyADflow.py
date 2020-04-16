@@ -1,6 +1,4 @@
 #!/usr/bin/python
-from __future__ import print_function
-from __future__ import division
 
 """
 pyADflow - A Python interface to ADflow.
@@ -1726,7 +1724,7 @@ class ADFLOW(AeroSolver):
 
         # Print alpha
         if self.comm.rank == 0:
-            print ('Current alpha is: ', aeroProblem.alpha)
+            print('Current alpha is: ', aeroProblem.alpha)
 
         self.__call__(aeroProblem, writeSolution=False)
         self.curAP.adflowData.callCounter -= 1
@@ -1771,7 +1769,7 @@ class ADFLOW(AeroSolver):
 
             # Print alpha
             if self.comm.rank == 0:
-                print ('Current alpha is: ', aeroProblem.alpha)
+                print('Current alpha is: ', aeroProblem.alpha)
 
             # Solve for n-1 value (anm1)
             self.__call__(aeroProblem, writeSolution=False)
@@ -1884,17 +1882,17 @@ class ADFLOW(AeroSolver):
         # Main iteration loop
         for jj in range(nIter):
             if self.comm.rank == 0:
-                print ('Fn:', Fn)
+                print('Fn:', Fn)
 
             # We now have a point and a jacobian...Newton's Method!
             Xnp1 = Xn - numpy.linalg.solve(J, Fn)
             if self.comm.rank == 0:
-                print ("Xnp1:", Xnp1)
+                print("Xnp1:", Xnp1)
 
             # Solve the new Xnp1
             Fnp1 = Func(Xnp1, CLStar)
             if self.comm.rank == 0:
-                print ("Fnp1:", Fnp1)
+                print("Fnp1:", Fnp1)
 
             # Update the jacobian using Broyden's method
             dx = Xnp1 - Xn
@@ -1902,7 +1900,7 @@ class ADFLOW(AeroSolver):
             J = J + numpy.outer((dF - numpy.dot(J, dx))/(numpy.linalg.norm(dx)**2), dx)
 
             if self.comm.rank == 0:
-                print ("New J:", J)
+                print("New J:", J)
 
             # Shuffle the Fn and Xn backwards
             Fn = Fnp1.copy()
@@ -1911,7 +1909,7 @@ class ADFLOW(AeroSolver):
             # Check for convergence
             if numpy.linalg.norm(Fn) < tol:
                 if self.comm.rank == 0:
-                    print ('Converged!', jj, Fn, Xn)
+                    print('Converged!', jj, Fn, Xn)
                 break
         return Xn
 
@@ -2130,7 +2128,7 @@ class ADFLOW(AeroSolver):
             print('+----------------------------------------------+')
 
         if self.comm.rank == 0:
-            print ('Searching for Correct Interval')
+            print('Searching for Correct Interval')
 
         # Now try to find the interval
         for i in range(nIter):
@@ -2172,7 +2170,7 @@ class ADFLOW(AeroSolver):
         highAlpha = max(anm1, anm2)
 
         if self.comm.rank == 0:
-            print ('Switching to Secant Search')
+            print('Switching to Secant Search')
 
         for iIter in range(nIter):
             if iIter != 0:
