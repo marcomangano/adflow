@@ -3290,10 +3290,9 @@ contains
     use blockPointers, only : nDom, flowDoms
     use inputIteration, only : L2conv
     use inputTimeSpectral, only : nTimeIntervalsSpectral
-    use inputDiscretization, only : approxSA
+    use inputDiscretization, only : approxSA, orderturb
     use iteration, only : approxTotalIts, totalR0, totalR, currentLevel
     use utils, only : EChk, setPointers, myisnan
-    use turbMod, only : secondOrd
     use solverUtils, only : computeUTau
     use NKSolver, only : getEwTol
     use BCRoutines, only : applyAllBC, applyAllBC_block
@@ -3305,14 +3304,14 @@ contains
     implicit none
 
     ! Working Variables
-    integer(kind=intType) :: ierr, maxIt, kspIterations, nn, sps, reason, nHist, iter, feval
+    integer(kind=intType) :: ierr, maxIt, kspIterations, nn, sps, reason, nHist, iter, feval, orderturbsave
     integer(kind=intType) :: i,j,k,n
     real(kind=realType) :: atol, val, v2, factK, gm1
     real(kind=alwaysRealType) :: rtol, totalR_dummy, linearRes, norm
     real(kind=alwaysRealType) :: resHist(ANK_maxIter+1)
     real(kind=alwaysRealType) :: unsteadyNorm, unsteadyNorm_old
     real(kind=alwaysRealType) :: linResMonitorTurb, totalRTurb
-    logical :: secondOrdSave, correctForK, LSFailed
+    logical :: correctForK, LSFailed
 
     ! Calculate the residuals and set rVecTurb before the first iteration
     call blocketteRes(useFlowRes=.False.,useStoreWall=.False.)
@@ -3350,8 +3349,8 @@ contains
         if (totalR > ANK_secondOrdSwitchTol*totalR0) then
             ! Save if second order turbulence is used, we will only use 1st order during ANK (only matters for the coupled solver)
             approxSA = .True.
-            secondOrdSave = secondOrd
-            secondOrd =.False.
+            orderturbsave = orderturb
+            orderturb = firstOrder
 
             ! Determine the relative convergence for the KSP solver
             rtol = ANK_rtol ! Just use the input relative tolerance for approximate fluxes
@@ -3412,7 +3411,7 @@ contains
         ! Return previously changed variables back to normal, VERY IMPORTANT
         if (totalR > ANK_secondOrdSwitchTol*totalR0) then
             ! Replace the second order turbulence option
-            secondOrd = secondOrdSave
+            orderturb = orderturbsave
             approxSA = .False.
         end if
 
@@ -3559,11 +3558,10 @@ contains
     use inputPhysics, only : equations
     use inputIteration, only : L2conv
     use inputTimeSpectral, only : nTimeIntervalsSpectral
-    use inputDiscretization, only : lumpedDiss, approxSA
+    use inputDiscretization, only : lumpedDiss, approxSA, orderturb
     use iteration, only : approxTotalIts, totalR0, totalR, stepMonitor, linResMonitor, currentLevel, iterType
     use utils, only : EChk, setPointers, myisnan
-    use turbAPI, only : turbSolveSegregated
-    use turbMod, only : secondOrd
+    use turbAPI, only : turbSolveDDADI
     use solverUtils, only : computeUTau
     use adjointUtils, only : referenceShockSensor
     use NKSolver, only : setRVec, getEwTol
@@ -3582,13 +3580,13 @@ contains
     logical, intent(in) :: firstCall
 
     ! Working Variables
-    integer(kind=intType) :: ierr, maxIt, kspIterations, nn, sps, reason, nHist, iter, feval
+    integer(kind=intType) :: ierr, maxIt, kspIterations, nn, sps, reason, nHist, iter, feval, orderturbsave
     integer(kind=intType) :: i,j,k
     real(kind=realType) :: atol, val, v2, factK, gm1
     real(kind=alwaysRealType) :: rtol, totalR_dummy, linearRes, norm
     real(kind=alwaysRealType) :: resHist(ANK_maxIter+1)
     real(kind=alwaysRealType) :: unsteadyNorm, unsteadyNorm_old
-    logical :: secondOrdSave, correctForK, LSFailed
+    logical :: correctForK, LSFailed
 
     ! Enter this check if this is the first ANK step OR we are switching to the coupled ANK solver
     if (firstCall .or. &
@@ -3749,9 +3747,9 @@ contains
        lumpedDiss = .True.
        approxSA = .True.
 
-       ! Save if second order turbulence is used, we will only use 1st order during ANK (only matters for the coupled solver)
-       secondOrdSave = secondOrd
-       secondOrd =.False.
+       ! Save the turbulence order, we will only use 1st order during ANK (only matters for the coupled solver)
+       orderturbsave = orderturb
+       orderturb = firstOrder
 
        ! Calculate the shock sensor here because the approximate routines do not
        call referenceShockSensor()
@@ -3820,8 +3818,8 @@ contains
        lumpedDiss = .False.
        approxSA = .False.
 
-       ! Replace the second order turbulence option
-       secondOrd = secondOrdSave
+       ! Replace turbulence order
+       orderturb = orderturbsave
 
     end if
 
@@ -3933,7 +3931,7 @@ contains
         if (ANK_useTurbDADI) then
             ! actually do the turbulence update
             call computeUtau
-            call turbSolveSegregated
+            call turbSolveDDADI
         else
             call ANKTurbSolveKSP
         end if
