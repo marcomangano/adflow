@@ -25,7 +25,7 @@ import reg_test_utils as utils
 
 from reg_default_options import adflowDefOpts, defaultAeroDVs, IDWarpDefOpts
 
-from reg_aeroproblems import ap_tutorial_wing, ap_tutorial_wing_laminar
+from reg_aeroproblems import ap_tutorial_wing, ap_tutorial_wing_laminar, ap_tutorial_wing_rotating
 from reg_test_classes import test_objects
 
 baseDir = os.path.dirname(os.path.abspath(__file__))
@@ -165,8 +165,61 @@ test_params = [
     },
 ]
 
+# Adding this separately because we don't have the complex version available yet
+rot_test = [    # # Rotating frame test
+    {
+        "name": "Rotating_wing",
+        "options": {
+            "gridFile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
+            "restartFile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
+            "equationType": "RANS",
+            "smoother": "dadi",
+            "lowspeedpreconditioner": True,
+            "userotationsa": True,
+            "useqcr": True,
+            "useblockettes": False,
+            "vis2": 0.250,
+            "restrictionrelaxation": 1.0,
+            "CFL": 1.5,
+            "CFLCoarse": 1.5,
+            "MGCycle": "sg",
+            "MGStartLevel": -1,
+            "nCyclesCoarse": 250,
+            "usenksolver": True,
+            "nkswitchtol": 1e-12,
+            "nkinnerpreconits": 2,
+            "nkjacobianlag": 3,
+            "nkouterpreconits": 3,
+            "nkpcilufill": 2,
+            "nksubspacesize": 100,
+            "useanksolver": True,
+            "ankswitchtol": 1.0,
+            "anklinearsolvetol": 0.05,
+            "ankcflexponent": 0.5,
+            "ankmaxiter": 60,
+            "ankpcilufill": 2,
+            "nsubiterturb": 10,
+            "ankstepmin": 0.01,
+            "anksecondordswitchtol": 1e-2,
+            "anklinresmax": 0.1,
+            "L2Convergence": 1e-10,
+            "L2ConvergenceCoarse": 1e-6,
+            "adjointL2Convergence": 1e-9,
+            "ADPC": True,
+            "adjointMaxIter": 500000,
+            "adjointSubspaceSize": 500,
+            "ILUFill": 2,
+            "ASMOverlap": 1,
+            "outerPreconIts": 3,
+            "monitorvariables": ["cpu", "resrho", "cl", "cd", "resturb", "cfx", "cmx", "yplus"],
+        },
+        "ref_file": "adjoint_rans_rotating.json",
+        "aero_prob": ap_tutorial_wing_rotating,
+        "evalFuncs": ["fx", "mx"],
+    }]
 
-@parameterized_class(test_params)
+
+@parameterized_class(test_params + rot_test)
 class TestAdjoint(test_objects.RegTest):
     """
     Tests that sensitives calculated from solving an adjoint are correct.
@@ -212,6 +265,10 @@ class TestAdjoint(test_objects.RegTest):
 
         self.CFDSolver.setMesh(USMesh(options=mesh_options))
         self.CFDSolver.setDVGeo(setDVGeo(self.ffdFile, cmplx=False))
+        if self.ap is ap_tutorial_wing_rotating:
+            # Add rotation component to the frame
+            rotRate_x = 1.5384615384615385
+            self.CFDSolver.setRotationRate([0, 0, 0], [rotRate_x, 0, 0])
 
         # propagates the values from the restart file throughout the code
         self.CFDSolver.getResidual(self.ap)
