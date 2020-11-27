@@ -170,8 +170,9 @@ rot_test = [    # # Rotating frame test
     {
         "name": "Rotating_wing",
         "options": {
-            "gridFile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
-            "restartFile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
+            "gridfile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
+            "restartfile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_rotframe.cgns"),
+            "ncycles": 20000,
             "equationType": "RANS",
             "smoother": "dadi",
             "lowspeedpreconditioner": True,
@@ -186,7 +187,7 @@ rot_test = [    # # Rotating frame test
             "MGStartLevel": -1,
             "nCyclesCoarse": 250,
             "usenksolver": True,
-            "nkswitchtol": 1e-12,
+            "nkswitchtol": 1e-9,
             "nkinnerpreconits": 2,
             "nkjacobianlag": 3,
             "nkouterpreconits": 3,
@@ -202,7 +203,7 @@ rot_test = [    # # Rotating frame test
             "ankstepmin": 0.01,
             "anksecondordswitchtol": 1e-2,
             "anklinresmax": 0.1,
-            "L2Convergence": 1e-10,
+            "L2Convergence": 1e-14,
             "L2ConvergenceCoarse": 1e-6,
             "adjointL2Convergence": 1e-9,
             "ADPC": True,
@@ -211,12 +212,20 @@ rot_test = [    # # Rotating frame test
             "ILUFill": 2,
             "ASMOverlap": 1,
             "outerPreconIts": 3,
-            "monitorvariables": ["cpu", "resrho", "cl", "cd", "resturb", "cfx", "cmx", "yplus"],
+            "monitorvariables": ["cpu", "resrho", "resturb", "cmx"],
+            'ankjacobianlag': 10,
+            'anksubspacesize': -1,
+            'blocksplitting': True,
+            'frozenturbulence': False,
+            'nkcfl0': 100.0,
+            'volumevariables': ['resrho'],
         },
         "ref_file": "adjoint_rans_rotating.json",
         "aero_prob": ap_tutorial_wing_rotating,
-        "evalFuncs": ["fx", "mx"],
-    }]
+        "evalFuncs": ["fy", "my"],
+        "N_PROCS": 2,
+    },
+]
 
 
 @parameterized_class(test_params + rot_test)
@@ -258,26 +267,31 @@ class TestAdjoint(test_objects.RegTest):
         self.ap.evalFuncs = self.evalFuncs
 
         # add the default dvs to the problem
-        for dv in defaultAeroDVs:
-            self.ap.addDV(dv)
+        if self.name != "Rotating_wing":
+            for dv in defaultAeroDVs:
+                self.ap.addDV(dv)
+        else:
+            for dv in ['alpha', 'beta', 'T', 'xRef', 'yRef', 'zRef']:
+                self.ap.addDV(dv)
 
         self.CFDSolver = ADFLOW(options=options, debug=True)
 
         self.CFDSolver.setMesh(USMesh(options=mesh_options))
         self.CFDSolver.setDVGeo(setDVGeo(self.ffdFile, cmplx=False))
-        if self.ap is ap_tutorial_wing_rotating:
+        if self.name == "Rotating_wing":
+            print("Testing the rotating case")
             # Add rotation component to the frame
             rotRate_x = 1.5384615384615385
-            self.CFDSolver.setRotationRate([0, 0, 0], [rotRate_x, 0, 0])
+            self.CFDSolver.setRotationRate([0, 0, 0], [0, -rotRate_x, 0])
 
         # propagates the values from the restart file throughout the code
         self.CFDSolver.getResidual(self.ap)
 
     def test_residuals(self):
-        utils.assert_residuals_allclose(self.handler, self.CFDSolver, self.ap, tol=1e-10)
+        utils.assert_residuals_allclose(self.handler, self.CFDSolver, self.ap, tol=5e-9)
 
     def test_adjoint(self):
-        utils.assert_adjoint_sens_allclose(self.handler, self.CFDSolver, self.ap, tol=1e-10)
+        utils.assert_adjoint_sens_allclose(self.handler, self.CFDSolver, self.ap, tol=5e-9)
 
 
 @parameterized_class(test_params)
