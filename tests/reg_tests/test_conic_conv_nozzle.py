@@ -13,13 +13,13 @@ import reg_test_utils as utils
 from reg_default_options import adflowDefOpts
 
 from reg_aeroproblems import ap_conic_conv_nozzle
-from reg_test_classes import test_objects
+import reg_test_classes
 
 
 baseDir = os.path.dirname(os.path.abspath(__file__))
 
 
-class TestSolveIntegrationPlane(test_objects.RegTest):
+class TestSolveIntegrationPlane(reg_test_classes.RegTest):
     """
     Tests that ADflow can converge the wing from the mdo tutorial using the euler
     equation to the required accuracy as meassure by the norm of the residuals,
@@ -36,8 +36,8 @@ class TestSolveIntegrationPlane(test_objects.RegTest):
         "gridfile": os.path.join(baseDir, "../../inputFiles/conic_conv_nozzle_mb.cgns"),
         "outputdirectory": os.path.join(baseDir, "../output_files"),
         # Physics Parameters
-        "equationType": "euler",
-        "smoother": "dadi",
+        "equationType": "Euler",
+        "smoother": "DADI",
         "nsubiter": 3,
         "CFL": 4.0,
         "CFLCoarse": 1.25,
@@ -45,7 +45,6 @@ class TestSolveIntegrationPlane(test_objects.RegTest):
         "MGStartLevel": -1,
         "nCyclesCoarse": 250,
         "nCycles": 1000,
-        "nkcfl0": 1e10,
         "monitorvariables": ["cpu", "resrho", "cl", "cd"],
         "volumevariables": ["blank"],
         "surfacevariables": ["mach", "cp", "vx", "vy", "vz", "blank"],
@@ -136,7 +135,7 @@ class TestSolveIntegrationPlane(test_objects.RegTest):
         utils.assert_residuals_allclose(self.handler, self.CFDSolver, self.ap, tol=1e-10)
 
 
-class TestSolveOverset(test_objects.RegTest):
+class TestSolveOverset(reg_test_classes.RegTest):
     """
     Tests that ADflow can converge the wing from the mdo tutorial using the euler
     equation to the required accuracy as meassure by the norm of the residuals,
@@ -151,8 +150,8 @@ class TestSolveOverset(test_objects.RegTest):
         "gridfile": os.path.join(baseDir, "../../inputFiles/conic_conv_nozzle.cgns"),
         "outputdirectory": os.path.join(baseDir, "../output_files"),
         # Physics Parameters
-        "equationType": "euler",
-        "smoother": "dadi",
+        "equationType": "Euler",
+        "smoother": "DADI",
         "nsubiter": 3,
         "CFL": 4.0,
         "CFLCoarse": 1.25,
@@ -160,7 +159,6 @@ class TestSolveOverset(test_objects.RegTest):
         "MGStartLevel": -1,
         "nCyclesCoarse": 250,
         "nCycles": 1000,
-        "nkcfl0": 1e10,
         "monitorvariables": ["cpu", "resrho", "cl", "cd"],
         "volumevariables": ["blank"],
         "surfacevariables": ["mach", "cp", "vx", "vy", "vz", "blank"],

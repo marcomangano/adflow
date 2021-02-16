@@ -26,7 +26,7 @@ import reg_test_utils as utils
 from reg_default_options import adflowDefOpts, defaultAeroDVs, IDWarpDefOpts
 
 from reg_aeroproblems import ap_tutorial_wing, ap_tutorial_wing_laminar, ap_tutorial_wing_rotating
-from reg_test_classes import test_objects
+import reg_test_classes
 
 baseDir = os.path.dirname(os.path.abspath(__file__))
 
@@ -126,7 +126,7 @@ test_params = [
             "ncyclescoarse": 250,
             "usenksolver": True,
             "nkswitchtol": 1e-2,
-            "equationtype": "Laminar NS",
+            "equationtype": "laminar NS",
             "useblockettes": False,
         },
         "ref_file": "adjoint_laminar_tut_wing.json",
@@ -141,10 +141,10 @@ test_params = [
             "restartfile": os.path.join(baseDir, "../../inputFiles/mdo_tutorial_rans_scalar_jst.cgns"),
             "mgcycle": "2w",
             "equationtype": "RANS",
-            "smoother": "dadi",
+            "smoother": "DADI",
             "cfl": 1.5,
             "cflcoarse": 1.25,
-            "resaveraging": "noresaveraging",
+            "resaveraging": "never",
             "nsubiter": 3,
             "nsubiterturb": 3,
             "ncyclescoarse": 100,
@@ -227,9 +227,8 @@ rot_test = [    # # Rotating frame test
     },
 ]
 
-
 @parameterized_class(test_params + rot_test)
-class TestAdjoint(test_objects.RegTest):
+class TestAdjoint(reg_test_classes.RegTest):
     """
     Tests that sensitives calculated from solving an adjoint are correct.
     and jacobian vector products are accurate.
@@ -313,7 +312,7 @@ class TestCmplxStep(unittest.TestCase):
             # classes created using parametrized
             # this will happen when training, but will hopefully be fixed down the line
             return
-        test_objects.RegTest.setUp(self)
+        reg_test_classes.RegTest.setUp(self)
 
         options = copy.copy(adflowDefOpts)
         options["outputdirectory"] = os.path.join(baseDir, options["outputdirectory"])

@@ -13,13 +13,13 @@ import reg_test_utils as utils
 from reg_default_options import adflowDefOpts
 
 from reg_aeroproblems import ap_naca0012_time_acc
-from reg_test_classes import test_objects
+import reg_test_classes
 
 
 baseDir = os.path.dirname(os.path.abspath(__file__))
 
 
-class TestSolve(test_objects.RegTest):
+class TestSolve(reg_test_classes.RegTest):
     """
     Tests that ADflow can converge the wing from the mdo tutorial using the euler
     equation to the required accuracy as meassure by the norm of the residuals,
@@ -52,10 +52,10 @@ class TestSolve(test_objects.RegTest):
                 "vis4": 0.025,
                 "vis2": 0.5,
                 "restrictionrelaxation": 0.5,
-                "smoother": "dadi",
+                "smoother": "DADI",
                 "equationtype": "RANS",
                 "equationmode": "unsteady",
-                "timeIntegrationscheme": "bdf",
+                "timeIntegrationscheme": "BDF",
                 "ntimestepsfine": nfineSteps,
                 "deltat": dt,
                 "nsubiterturb": 10,
